@@ -251,6 +251,31 @@ impl pallet_balances::Config for Runtime {
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
 }
 
+impl pallet_nicks::Config for Runtime {
+	// The Balances pallet implements the ReservableCurrency trait.
+	// `Balances` is defined in `construct_runtime!` macro.
+	type Currency = Balances;
+	
+	// Set ReservationFee to a value.
+	type ReservationFee = ConstU128<100>;
+	
+	// No action is taken when deposits are forfeited.
+	type Slashed = ();
+	
+	// Configure the FRAME System Root origin as the Nick pallet admin.
+	// https://paritytech.github.io/substrate/master/frame_system/enum.RawOrigin.html#variant.Root
+	type ForceOrigin = frame_system::EnsureRoot<AccountId>;
+	
+	// Set MinLength of nick name to a desired value.
+	type MinLength = ConstU32<8>;
+	
+	// Set MaxLength of nick name to a desired value.
+	type MaxLength = ConstU32<32>;
+	
+	// The ubiquitous event type.
+	type Event = Event;
+	}
+
 impl pallet_transaction_payment::Config for Runtime {
 	type Event = Event;
 	type OnChargeTransaction = CurrencyAdapter<Balances, ()>;
@@ -270,6 +295,67 @@ impl pallet_template::Config for Runtime {
 	type Event = Event;
 }
 
+// impl pallet_assets::Config for Runtime {
+//     type RuntimeEvent = Event;
+//     type Balance = Balances;
+//     type AssetId = u64;
+//     type Currency = Balances;
+//     type ForceOrigin = frame_system::EnsureRoot<AccountId>;
+//     type AssetDeposit = Balance;
+//     type AssetAccountDeposit = Balance;
+//     type MetadataDepositBase = Balance;
+//     type MetadataDepositPerByte = Balance;
+//     type ApprovalDeposit = Balance;
+//     type StringLimit = ConstU32<32>;
+//     type Freezer = ();
+//     type Extra = ();
+//     type WeightInfo = pallet_balances::weights::SubstrateWeight<Runtime>;
+// }
+
+/// Constant values used within the runtime.
+pub const MILLIASTR: Balance = 1_000_000_000_000_000;
+
+/// Charge fee for stored bytes and items.
+pub const fn deposit(items: u32, bytes: u32) -> Balance {
+    (items as Balance + bytes as Balance) * MILLIASTR / 1_000_000
+}
+
+/// Id used for identifying assets.
+///
+/// AssetId allocation:
+/// [1; 2^32-1]     Custom user assets (permissionless)
+/// [2^32; 2^64-1]  Statemine assets (simple map)
+/// [2^64; 2^128-1] Ecosystem assets
+/// 2^128-1         Relay chain token (KSM)
+pub type AssetId = u128;
+
+parameter_types! {
+    pub const AssetDeposit: Balance = 1_000_000;
+    pub const ApprovalDeposit: Balance = 1_000_000;
+    pub const AssetsStringLimit: u32 = 50;
+    /// Key = 32 bytes, Value = 36 bytes (32+1+1+1+1)
+    // https://github.com/paritytech/substrate/blob/069917b/frame/assets/src/lib.rs#L257L271
+    pub const MetadataDepositBase: Balance = deposit(1, 68);
+    pub const MetadataDepositPerByte: Balance = deposit(0, 1);
+    pub const AssetAccountDeposit: Balance = deposit(1, 18);
+}
+
+impl pallet_assets::Config for Runtime {
+    type Event = Event;
+    type Balance = Balance;
+    type AssetId = AssetId;
+    type Currency = Balances;
+    type ForceOrigin = frame_system::EnsureRoot<AccountId>;
+    type AssetDeposit = AssetDeposit;
+    type MetadataDepositBase = MetadataDepositBase;
+    type MetadataDepositPerByte = MetadataDepositPerByte;
+    type AssetAccountDeposit = AssetAccountDeposit;
+    type ApprovalDeposit = ApprovalDeposit;
+    type StringLimit = AssetsStringLimit;
+    type Freezer = ();
+    type Extra = ();
+    type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
+}
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub struct Runtime
@@ -288,6 +374,8 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
+		Nicks: pallet_nicks,
+		Assets: pallet_assets,
 	}
 );
 
